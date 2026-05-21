@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FitTrack</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f0f0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FitTrack">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f0f0f;--s1:#1a1a1a;--s2:#242424;--s3:#2e2e2e;
+  --accent:#00d68f;--accent-bg:rgba(0,214,143,.13);
+  --text:#f0f0f0;--t2:#888;--t3:#555;
+  --danger:#ff4444;--warn:#ffaa00;
+  --border:#2a2a2a;--r:12px;--r-sm:8px;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ── NAV ── */
+.nav{position:fixed;bottom:0;left:0;right:0;background:var(--s1);border-top:1px solid var(--border);display:flex;padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:100}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;cursor:pointer;color:var(--t3);transition:color .2s;font-size:10px;font-weight:500;letter-spacing:.3px}
+.nav-item.active{color:var(--accent)}
+.nav-icon{font-size:20px;line-height:1}
+
+/* ── SECTIONS ── */
+.section{display:none;padding:16px 16px calc(80px + env(safe-area-inset-bottom));max-width:520px;margin:0 auto;animation:fadeIn .2s ease}
+.section.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── TYPOGRAPHY ── */
+.page-title{font-size:26px;font-weight:700;margin-bottom:4px}
+.page-sub{color:var(--t2);font-size:13px;margin-bottom:20px}
+.section-label{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin:20px 0 8px}
+
+/* ── CARD ── */
+.card{background:var(--s1);border-radius:var(--r);border:1px solid var(--border);margin-bottom:12px;overflow:hidden}
+.card-pad{padding:16px}
+
+/* ── WEEK STRIP ── */
+.week-strip{display:flex;gap:6px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px;-ms-overflow-style:none;scrollbar-width:none}
+.week-strip::-webkit-scrollbar{display:none}
+.day-chip{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 10px 8px;border-radius:10px;background:var(--s2);border:1.5px solid var(--border);min-width:44px;cursor:pointer;transition:all .2s}
+.day-chip.train-day{border-color:rgba(0,214,143,.3)}
+.day-chip.today{background:var(--accent);color:#000;border-color:var(--accent)}
+.day-chip.today .chip-day,.day-chip.today .chip-num,.day-chip.today .chip-dot{color:#000;background:#000}
+.day-chip.done{background:var(--accent-bg);border-color:var(--accent)}
+.chip-day{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--t3)}
+.day-chip.today .chip-day{color:#000}
+.chip-num{font-size:17px;font-weight:700}
+.chip-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0}
+.train-day .chip-dot{opacity:1}
+.today .chip-dot{background:#000;opacity:1}
+.done .chip-dot{background:var(--accent)}
+
+/* ── TODAY CARD ── */
+.today-card{background:linear-gradient(135deg,#0d2b22,#0f1a14);border:1px solid rgba(0,214,143,.25);border-radius:var(--r);padding:20px;margin-bottom:12px}
+.today-label{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.today-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.today-meta{color:var(--t2);font-size:13px;margin-bottom:16px}
+
+/* ── STAT GRID ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+.stat-box{background:var(--s1);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 12px;text-align:center}
+.stat-num{font-size:22px;font-weight:700;color:var(--accent)}
+.stat-lbl{font-size:11px;color:var(--t2);margin-top:2px}
+
+/* ── EXERCISE LIST ── */
+.ex-row{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)}
+.ex-row:last-child{border-bottom:none}
+.ex-info{flex:1}
+.ex-name{font-size:15px;font-weight:500}
+.ex-sub{font-size:12px;color:var(--t2);margin-top:2px}
+.ex-badge{background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.ex-badge.warn{background:rgba(255,170,0,.12);color:var(--warn)}
+
+/* ── PROGRAM DAYS ── */
+.prog-day{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.prog-day-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none}
+.prog-day-title{font-size:16px;font-weight:600}
+.prog-day-meta{font-size:12px;color:var(--t2);margin-top:2px}
+.prog-day-body{border-top:1px solid var(--border)}
+.chevron{color:var(--t3);font-size:14px;transition:transform .2s;flex-shrink:0}
+.chevron.open{transform:rotate(180deg)}
+
+/* ── ACTIVE WORKOUT ── */
+.workout-header{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.workout-elapsed{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent)}
+.active-ex{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.active-ex.current-ex{border-color:var(--accent)}
+.active-ex-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer}
+.active-ex-name{font-size:15px;font-weight:600}
+.active-ex-progress{font-size:12px;color:var(--t2)}
+.active-ex-body{padding:8px 16px 14px;border-top:1px solid var(--border)}
+.set-grid-hd{display:grid;grid-template-columns:32px 1fr 1fr 44px;gap:8px;padding:4px 0 8px}
+.set-grid-lbl{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;text-align:center}
+.set-grid-lbl:first-child{text-align:left;padding-left:4px}
+.set-row{display:grid;grid-template-columns:32px 1fr 1fr 44px;gap:8px;align-items:center;margin-bottom:6px}
+.set-num{font-size:13px;font-weight:600;color:var(--t3);text-align:center}
+.set-input{background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 8px;color:var(--text);font-size:16px;text-align:center;outline:none;width:100%;transition:border-color .15s}
+.set-input:focus{border-color:var(--accent)}
+.set-input::placeholder{color:var(--t3);font-size:12px}
+.set-input.done-input{border-color:rgba(0,214,143,.4);background:rgba(0,214,143,.06);color:var(--accent)}
+.set-check{width:40px;height:40px;border-radius:50%;border:2px solid var(--border);background:transparent;color:var(--t3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.set-check:active{transform:scale(.92)}
+.set-check.done{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+.prev-hint{font-size:11px;color:var(--t3);margin-bottom:8px}
+.prev-hint span{color:var(--t2)}
+.add-set-btn{width:100%;padding:9px;border-radius:var(--r-sm);border:1px dashed var(--border);background:transparent;color:var(--t2);font-size:13px;cursor:pointer;margin-top:6px;transition:all .15s}
+.add-set-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── BUTTONS ── */
+.btn{padding:14px 20px;border-radius:var(--r);border:none;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-ghost{background:var(--s2);color:var(--text);border:1px solid var(--border)}
+.btn-sm{padding:9px 16px;font-size:13px;width:auto;border-radius:var(--r-sm)}
+
+/* ── TIMER OVERLAY ── */
+#timer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(12px);z-index:200;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.timer-ring{position:relative;width:220px;height:220px;margin-bottom:28px}
+.timer-ring svg{transform:rotate(-90deg)}
+.ring-track{fill:none;stroke:var(--s2);stroke-width:10}
+.ring-progress{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+.timer-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.timer-time{font-size:60px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-3px}
+.timer-lbl{color:var(--t2);font-size:13px;margin-top:2px}
+.timer-presets{display:flex;gap:8px;margin-bottom:24px}
+.preset-btn{padding:8px 16px;border-radius:20px;border:1.5px solid var(--border);background:var(--s2);color:var(--t2);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s}
+.preset-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.timer-btns{display:flex;gap:10px;width:100%;max-width:300px}
+.timer-ring.warning .ring-progress{stroke:var(--warn)}
+.timer-ring.danger .ring-progress{stroke:var(--danger)}
+@keyframes ring-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.timer-ring.done .ring-progress{animation:ring-pulse .5s ease infinite}
+
+/* ── HISTORY ── */
+.hist-item{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;cursor:pointer}
+.hist-date{font-size:12px;color:var(--t2);margin-bottom:4px}
+.hist-title{font-size:16px;font-weight:600;margin-bottom:8px}
+.hist-tags{display:flex;flex-wrap:wrap;gap:5px}
+.hist-tag{background:var(--s2);color:var(--t2);font-size:11px;padding:3px 8px;border-radius:10px}
+.hist-detail{border-top:1px solid var(--border);margin-top:12px;padding-top:12px;display:none}
+.hist-detail.open{display:block}
+.hist-set-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid var(--border)}
+.hist-set-row:last-child{border-bottom:none}
+.hist-set-name{color:var(--t2)}
+.hist-set-val{color:var(--text);font-weight:500}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:60px 24px;color:var(--t2)}
+.empty-icon{font-size:44px;margin-bottom:12px}
+.empty-title{font-size:17px;font-weight:600;color:var(--text);margin-bottom:6px}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--s2);color:var(--text);padding:11px 20px;border-radius:24px;font-size:14px;font-weight:500;border:1px solid var(--border);opacity:0;transition:all .28s;white-space:nowrap;z-index:300;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── MISC ── */
+.divider{height:1px;background:var(--border);margin:12px 0}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-green{background:var(--accent-bg);color:var(--accent)}
+.badge-yellow{background:rgba(255,170,0,.12);color:var(--warn)}
+.note-box{background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:16px}
+.note-box strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- SECTIONS -->
+<div id="sec-overview" class="section active">
+  <div id="overview-content"></div>
+</div>
+
+<div id="sec-program" class="section">
+  <div id="program-content"></div>
+</div>
+
+<div id="sec-train" class="section">
+  <div id="train-content"></div>
+</div>
+
+<div id="sec-history" class="section">
+  <div id="history-content"></div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-item active" onclick="navigate('overview')" id="nav-overview">
+    <span class="nav-icon">◎</span>總覽
+  </div>
+  <div class="nav-item" onclick="navigate('program')" id="nav-program">
+    <span class="nav-icon">📋</span>課表
+  </div>
+  <div class="nav-item" onclick="navigate('train')" id="nav-train">
+    <span class="nav-icon">⚡</span>訓練
+  </div>
+  <div class="nav-item" onclick="navigate('history')" id="nav-history">
+    <span class="nav-icon">📊</span>紀錄
+  </div>
+</nav>
+
+<!-- TIMER OVERLAY -->
+<div id="timer-overlay">
+  <p style="color:var(--t2);font-size:13px;margin-bottom:16px;font-weight:600;text-transform:uppercase;letter-spacing:.8px">組間休息</p>
+  <div class="timer-ring" id="timer-ring">
+    <svg width="220" height="220" viewBox="0 0 220 220">
+      <circle class="ring-track" cx="110" cy="110" r="96"/>
+      <circle class="ring-progress" id="ring-progress" cx="110" cy="110" r="96"
+        stroke-dasharray="603.19" stroke-dashoffset="0"/>
+    </svg>
+    <div class="timer-center">
+      <div class="timer-time" id="timer-time">1:30</div>
+      <div class="timer-lbl" id="timer-lbl">剩餘秒數</div>
+    </div>
+  </div>
+  <div class="timer-presets">
+    <button class="preset-btn" onclick="setTimerPreset(60)">60s</button>
+    <button class="preset-btn active" onclick="setTimerPreset(90)" id="preset-90">90s</button>
+    <button class="preset-btn" onclick="setTimerPreset(120)">120s</button>
+    <button class="preset-btn" onclick="setTimerPreset(180)">180s</button>
+  </div>
+  <div class="timer-btns">
+    <button class="btn btn-ghost btn-sm" style="flex:1" onclick="toggleTimer()" id="timer-pause-btn">⏸ 暫停</button>
+    <button class="btn btn-ghost btn-sm" style="flex:1" onclick="skipTimer()">跳過 ›</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════
+//  DATA
+// ════════════════════════════════
+const PROGRAM = {
+  name: '復出計劃 Phase 1',
+  note: '以你過去 Peeta 中階課表為參考，降低起始重量（原 1RM 約 50%）。目標是讓神經系統和關節重新適應，不急著衝重量。RPE 7 為上限，每週視感覺小幅加重。',
+  trainingDays: [1, 3, 5], // Mon, Wed, Fri
+  days: [
+    {
+      id: 'A', label: 'Day A', name: '全身 · 推腿為主',
+      targetRpe: 7, restSec: 120,
+      exercises: [
+        { id: 'squat',   name: '深蹲 Back Squat',       sets: 3, reps: '8',   muscle: '腿',  note: '過去 1RM 65kg，起步建議 30-35kg' },
+        { id: 'bench',   name: '臥推 Bench Press',       sets: 3, reps: '8',   muscle: '胸',  note: '過去 1RM 35kg，起步建議 15-20kg' },
+        { id: 'row_bb',  name: '槓鈴划船 Barbell Row',   sets: 3, reps: '8',   muscle: '背',  note: '過去紀錄 30kg，起步建議 15kg' },
+        { id: 'ohp',     name: '肩推 Overhead Press',    sets: 3, reps: '8',   muscle: '肩',  note: '過去 1RM 22kg，起步建議 10-12kg' },
+        { id: 'plank',   name: '棒式 Plank',             sets: 3, reps: '30s', muscle: '核心', note: '視狀況延長至 45-60s' }
+      ]
+    },
+    {
+      id: 'B', label: 'Day B', name: '全身 · 拉腿為主',
+      targetRpe: 7, restSec: 120,
+      exercises: [
+        { id: 'dl',      name: '硬舉 Deadlift',          sets: 3, reps: '5',    muscle: '背/腿', note: '過去 1RM 75kg，起步建議 40kg' },
+        { id: 'pullup',  name: '引體向上 Pull-up',        sets: 3, reps: 'max', muscle: '背',    note: '需要可加彈力帶輔助（你曾用 25kg band）' },
+        { id: 'incline', name: '上斜臥推 Incline Bench',  sets: 3, reps: '10',  muscle: '胸',    note: '' },
+        { id: 'rdl',     name: 'RDL 羅馬尼亞硬舉',       sets: 3, reps: '10',  muscle: '腿/背', note: '' },
+        { id: 'lateral', name: '側舉 Lateral Raise',      sets: 3, reps: '15',  muscle: '肩',    note: '輕啞鈴，感受側三角' }
+      ]
+    },
+    {
+      id: 'C', label: 'Day C', name: '全身 · 強度提升',
+      targetRpe: 7.5, restSec: 150,
+      exercises: [
+        { id: 'squat_c', name: '深蹲 Back Squat',        sets: 4, reps: '5',   muscle: '腿',  note: '比 Day A 重 5-10%，最後一組衝 RPE 8' },
+        { id: 'bench_c', name: '臥推 Bench Press',        sets: 4, reps: '5',   muscle: '胸',  note: '同上策略' },
+        { id: 'row_c',   name: '坐姿划船 Seated Row',     sets: 3, reps: '10',  muscle: '背',  note: '' },
+        { id: 'split',   name: '保加利亞分腿蹲 BSS',      sets: 3, reps: '10/側', muscle: '腿', note: '你曾做過，輕重量練平衡' },
+        { id: 'face',    name: 'Face Pull',               sets: 3, reps: '15',  muscle: '後肩/肩旋轉肌', note: '護肩必做' }
+      ]
+    }
+  ]
+}
+
+// ════════════════════════════════
+//  STORAGE
+// ════════════════════════════════
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem('fittrack_v1') || '{}')
+    return { logs: d.logs || [], settings: d.settings || { restSec: 90 }, ...d }
+  } catch { return { logs: [], settings: { restSec: 90 } } }
+}
+function save(db) { localStorage.setItem('fittrack_v1', JSON.stringify(db)) }
+
+let DB = load()
+
+// ════════════════════════════════
+//  STATE
+// ════════════════════════════════
+let state = {
+  tab: 'overview',
+  workout: null,      // active workout
+  workoutStart: null,
+  elapsedTimer: null,
+  expandedDays: new Set(['A']),
+  expandedHistItems: new Set(),
+  expandedActiveEx: new Set(),
+  timer: { active: false, duration: 90, remaining: 0, interval: null, paused: false }
+}
+
+// ════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════
+function navigate(tab) {
+  state.tab = tab
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'))
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  document.getElementById('sec-' + tab).classList.add('active')
+  document.getElementById('nav-' + tab).classList.add('active')
+  render()
+}
+
+// ════════════════════════════════
+//  RENDER OVERVIEW
+// ════════════════════════════════
+function render() {
+  if (state.tab === 'overview') renderOverview()
+  else if (state.tab === 'program') renderProgram()
+  else if (state.tab === 'train') renderTrain()
+  else if (state.tab === 'history') renderHistory()
+}
+
+function renderOverview() {
+  const el = document.getElementById('overview-content')
+  const today = new Date()
+  const todayDow = today.getDay() // 0=Sun
+  const todayDate = today.getDate()
+
+  // Week days
+  const weekStart = new Date(today)
+  weekStart.setDate(today.getDate() - today.getDay())
+  const days = ['日','一','二','三','四','五','六']
+
+  let chips = ''
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + i)
+    const isToday = i === today.getDay()
+    const isTrain = PROGRAM.trainingDays.includes(i)
+    const isDone = isWorkoutDoneOnDate(d)
+    chips += `<div class="day-chip${isTrain?' train-day':''}${isToday?' today':''}${isDone?' done':''}">
+      <span class="chip-day">${days[i]}</span>
+      <span class="chip-num">${d.getDate()}</span>
+      <span class="chip-dot"></span>
+    </div>`
+  }
+
+  // Today's workout
+  const todayProgramDay = getTodayProgramDay()
+  const isTrainingToday = PROGRAM.trainingDays.includes(todayDow)
+  const isTodayDone = isWorkoutDoneToday()
+
+  let todayCard = ''
+  if (state.workout) {
+    todayCard = `<div class="today-card">
+      <div class="today-label">⚡ 訓練進行中</div>
+      <div class="today-title">${state.workout.dayName}</div>
+      <div class="today-meta">${state.workout.exercises.filter(e=>e.sets.some(s=>s.done)).length} / ${state.workout.exercises.length} 動作完成中</div>
+      <button class="btn btn-primary" onclick="navigate('train')">繼續訓練</button>
+    </div>`
+  } else if (isTodayDone) {
+    todayCard = `<div class="today-card" style="background:linear-gradient(135deg,#0a1f0a,#0d1a10)">
+      <div class="today-label" style="color:#4ade80">✓ 今日訓練完成</div>
+      <div class="today-title">${todayProgramDay ? todayProgramDay.label + ' — ' + todayProgramDay.name : '休息日'}</div>
+      <div class="today-meta">幹得好！明天繼續保持</div>
+      <button class="btn btn-ghost" onclick="navigate('history')" style="margin-top:4px">查看紀錄</button>
+    </div>`
+  } else if (isTrainingToday && todayProgramDay) {
+    todayCard = `<div class="today-card">
+      <div class="today-label">今日訓練</div>
+      <div class="today-title">${todayProgramDay.label} — ${todayProgramDay.name}</div>
+      <div class="today-meta">${todayProgramDay.exercises.length} 個動作 · 組間休息 ${todayProgramDay.restSec}s · 目標 RPE ${todayProgramDay.targetRpe}</div>
+      <button class="btn btn-primary" onclick="startWorkout('${todayProgramDay.id}')">開始訓練</button>
+    </div>`
+  } else {
+    const next = getNextTrainingDay()
+    todayCard = `<div class="today-card" style="background:linear-gradient(135deg,#1a1210,#120f0d)">
+      <div class="today-label" style="color:var(--warn)">今日休息</div>
+      <div class="today-title">好好恢復</div>
+      <div class="today-meta">下次訓練：${next}</div>
+      <button class="btn btn-ghost" onclick="navigate('program')" style="margin-top:4px">查看課表</button>
+    </div>`
+  }
+
+  // Stats
+  const thisWeekCount = getThisWeekWorkoutCount()
+  const totalCount = DB.logs.length
+  const streak = getCurrentStreak()
+
+  // Next workouts
+  let upcomingHTML = ''
+  for (let i = 0; i < 3; i++) {
+    const day = PROGRAM.days[i]
+    const nextDate = getNextDateForProgramDay(day.id)
+    upcomingHTML += `<div class="ex-row" onclick="navigate('program')">
+      <div class="ex-info">
+        <div class="ex-name">${day.label} — ${day.name}</div>
+        <div class="ex-sub">${day.exercises.map(e=>e.name.split(' ')[0]).join(' · ')}</div>
+      </div>
+      <div class="ex-badge">${nextDate}</div>
+    </div>`
+  }
+
+  el.innerHTML = `
+    <div class="page-title">FitTrack</div>
+    <div class="page-sub">${formatDate(today)}</div>
+    ${todayCard}
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-num">${thisWeekCount}/3</div><div class="stat-lbl">本週進度</div></div>
+      <div class="stat-box"><div class="stat-num">${totalCount}</div><div class="stat-lbl">總訓練次</div></div>
+      <div class="stat-box"><div class="stat-num">${streak}</div><div class="stat-lbl">連續週</div></div>
+    </div>
+    <div class="week-strip">${chips}</div>
+    <div class="section-label">本週課表</div>
+    <div class="card">${upcomingHTML}</div>
+  `
+}
+
+// ════════════════════════════════
+//  RENDER PROGRAM
+// ════════════════════════════════
+function renderProgram() {
+  const el = document.getElementById('program-content')
+  let html = `
+    <div class="page-title">課表</div>
+    <div class="page-sub">${PROGRAM.name}</div>
+    <div class="note-box"><strong>設計說明：</strong>${PROGRAM.note}</div>
+  `
+  PROGRAM.days.forEach(day => {
+    const isOpen = state.expandedDays.has(day.id)
+    let exRows = ''
+    if (isOpen) {
+      exRows = `<div class="prog-day-body">`
+      day.exercises.forEach(ex => {
+        exRows += `<div class="ex-row">
+          <div class="ex-info">
+            <div class="ex-name">${ex.name}</div>
+            <div class="ex-sub">${ex.sets}組 × ${ex.reps} · ${ex.muscle}${ex.note?` · ${ex.note}`:''}</div>
+          </div>
+        </div>`
+      })
+      exRows += `</div>`
+    }
+    html += `<div class="prog-day card" style="margin-bottom:10px">
+      <div class="prog-day-hd" onclick="toggleDay('${day.id}')">
+        <div>
+          <div class="prog-day-title">${day.label} — ${day.name}</div>
+          <div class="prog-day-meta">${day.exercises.length} 個動作 · 休息 ${day.restSec}s · RPE ${day.targetRpe}</div>
+        </div>
+        <span class="chevron${isOpen?' open':''}">▾</span>
+      </div>
+      ${exRows}
+    </div>`
+  })
+
+  const days = ['週日','週一','週二','週三','週四','週五','週六']
+  const trainDayNames = PROGRAM.trainingDays.map(d=>days[d]).join('、')
+  html += `<div class="section-label">訓練日安排</div>
+    <div class="card card-pad" style="font-size:14px;color:var(--t2);line-height:1.8">
+      固定訓練日：<strong style="color:var(--text)">${trainDayNames}</strong><br>
+      課表循環：Day A → Day B → Day C → 下週再從 A 開始<br>
+      建議持續 <strong style="color:var(--text)">4-6 週</strong>，之後可進階到 PPL 分化訓練
+    </div>
+    <div class="section-label">進階原則</div>
+    <div class="card card-pad" style="font-size:13px;color:var(--t2);line-height:1.8">
+      • 每週同一動作若 RPE ≤ 6，下次加 2.5-5kg<br>
+      • 引體向上：先做出 3×5 再逐步減輕輔助<br>
+      • 前 4 週不做力竭，讓肌腱、韌帶充分適應<br>
+      • 有氧可在非訓練日輕鬆做 20-30 分鐘
+    </div>
+  `
+  el.innerHTML = html
+}
+
+function toggleDay(id) {
+  if (state.expandedDays.has(id)) state.expandedDays.delete(id)
+  else state.expandedDays.add(id)
+  renderProgram()
+}
+
+// ════════════════════════════════
+//  RENDER TRAIN
+// ════════════════════════════════
+function renderTrain() {
+  const el = document.getElementById('train-content')
+
+  if (!state.workout) {
+    // No active workout — show selection
+    let dayBtns = PROGRAM.days.map(d => `
+      <div class="card" style="margin-bottom:10px">
+        <div class="ex-row" style="cursor:pointer" onclick="startWorkout('${d.id}')">
+          <div class="ex-info">
+            <div class="ex-name">${d.label} — ${d.name}</div>
+            <div class="ex-sub">${d.exercises.length} 個動作 · 組間 ${d.restSec}s</div>
+          </div>
+          <div class="ex-badge">開始 ›</div>
+        </div>
+      </div>`).join('')
+
+    el.innerHTML = `
+      <div class="page-title">訓練</div>
+      <div class="page-sub">選擇今日課表</div>
+      ${dayBtns}
+      <div class="note-box" style="margin-top:8px">
+        💡 建議順序：<strong>A → B → C</strong> 循環。今日推薦：<strong>${getRecommendedDay()}</strong>
+      </div>
+    `
+    return
+  }
+
+  // Active workout
+  const w = state.workout
+  const elapsed = formatElapsed(state.workoutStart)
+
+  let exCards = ''
+  w.exercises.forEach((ex, ei) => {
+    const isOpen = state.expandedActiveEx.has(ei)
+    const doneSets = ex.sets.filter(s => s.done).length
+    const totalSets = ex.sets.length
+    const allDone = doneSets === totalSets
+    const isCurrent = !allDone && w.exercises.slice(0, ei).every(e => e.sets.every(s => s.done))
+
+    // Previous best
+    const prev = getPreviousBest(ex.id)
+    const prevHint = prev ? `上次：${prev}` : '無紀錄（新開始）'
+
+    // Set rows
+    let setRowsHTML = ''
+    ex.sets.forEach((set, si) => {
+      const isDone = set.done
+      setRowsHTML += `<div class="set-row">
+        <div class="set-num">${si + 1}</div>
+        <input class="set-input${isDone?' done-input':''}" type="number" inputmode="decimal"
+          placeholder="${ex.reps.includes('s') ? ex.reps : '重量 kg'}"
+          value="${set.weight || ''}"
+          onchange="updateSet(${ei},${si},'weight',this.value)"
+          ${isDone ? 'readonly' : ''}>
+        <input class="set-input${isDone?' done-input':''}" type="number" inputmode="decimal"
+          placeholder="${ex.reps.includes('s') || ex.reps === 'max' ? ex.reps : '次數'}"
+          value="${set.reps || ''}"
+          onchange="updateSet(${ei},${si},'reps',this.value)"
+          ${isDone ? 'readonly' : ''}>
+        <button class="set-check${isDone?' done':''}" onclick="completeSet(${ei},${si})">
+          ${isDone ? '✓' : '○'}
+        </button>
+      </div>`
+    })
+
+    exCards += `<div class="active-ex${isCurrent && !allDone ? ' current-ex' : ''}" id="ex-card-${ei}">
+      <div class="active-ex-hd" onclick="toggleActiveEx(${ei})">
+        <div>
+          <div class="active-ex-name">${allDone ? '✓ ' : ''}${ex.name}</div>
+          <div class="active-ex-progress">${ex.muscle} · ${doneSets}/${totalSets} 組完成</div>
+        </div>
+        <span class="chevron${isOpen || isCurrent ? ' open' : ''}">▾</span>
+      </div>
+      ${isOpen || (isCurrent && !allDone) ? `
+      <div class="active-ex-body">
+        <div class="prev-hint">上次紀錄：<span>${prevHint}</span></div>
+        <div class="set-grid-hd">
+          <div class="set-grid-lbl">組</div>
+          <div class="set-grid-lbl">${ex.reps.includes('s') ? '秒數' : '公斤'}</div>
+          <div class="set-grid-lbl">次數</div>
+          <div class="set-grid-lbl">完成</div>
+        </div>
+        ${setRowsHTML}
+        <button class="add-set-btn" onclick="addSet(${ei})">＋ 加一組</button>
+      </div>` : ''}
+    </div>`
+  })
+
+  const allWorkoutDone = w.exercises.every(e => e.sets.every(s => s.done))
+
+  el.innerHTML = `
+    <div class="workout-header">
+      <div>
+        <div style="font-size:12px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:.6px">訓練中</div>
+        <div style="font-size:16px;font-weight:600;margin-top:2px">${w.dayLabel} — ${w.dayName}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="workout-elapsed">${elapsed}</div>
+        <div style="font-size:11px;color:var(--t2)">已過時間</div>
+      </div>
+    </div>
+    ${exCards}
+    ${allWorkoutDone
+      ? `<button class="btn btn-primary" style="margin-top:8px" onclick="finishWorkout()">✓ 完成訓練</button>`
+      : `<button class="btn btn-ghost" style="margin-top:8px" onclick="abandonWorkout()">放棄本次訓練</button>`
+    }
+  `
+}
+
+// ════════════════════════════════
+//  WORKOUT CONTROL
+// ════════════════════════════════
+function startWorkout(dayId) {
+  const day = PROGRAM.days.find(d => d.id === dayId)
+  if (!day) return
+  state.workout = {
+    dayId: day.id,
+    dayLabel: day.label,
+    dayName: day.name,
+    restSec: day.restSec,
+    exercises: day.exercises.map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      muscle: ex.muscle,
+      reps: ex.reps,
+      sets: Array.from({ length: ex.sets }, () => ({ weight: '', reps: '', done: false }))
+    }))
+  }
+  state.workoutStart = Date.now()
+  if (state.elapsedTimer) clearInterval(state.elapsedTimer)
+  state.elapsedTimer = setInterval(() => {
+    if (state.tab === 'train') renderTrain()
+  }, 10000)
+  state.expandedActiveEx.clear()
+  navigate('train')
+}
+
+function updateSet(exIdx, setIdx, field, val) {
+  state.workout.exercises[exIdx].sets[setIdx][field] = val
+}
+
+function completeSet(exIdx, setIdx) {
+  const set = state.workout.exercises[exIdx].sets[setIdx]
+  if (set.done) return
+  set.done = true
+  const ex = state.workout.exercises[exIdx]
+  const allSetsOfThisExDone = ex.sets.every(s => s.done)
+  if (allSetsOfThisExDone) {
+    state.expandedActiveEx.delete(exIdx)
+    if (exIdx + 1 < state.workout.exercises.length) {
+      state.expandedActiveEx.add(exIdx + 1)
+    }
+  }
+  startTimer(state.workout.restSec)
+  renderTrain()
+}
+
+function addSet(exIdx) {
+  const ex = state.workout.exercises[exIdx]
+  const lastDone = [...ex.sets].reverse().find(s => s.done)
+  ex.sets.push({ weight: lastDone ? lastDone.weight : '', reps: lastDone ? lastDone.reps : '', done: false })
+  renderTrain()
+}
+
+function toggleActiveEx(idx) {
+  if (state.expandedActiveEx.has(idx)) state.expandedActiveEx.delete(idx)
+  else state.expandedActiveEx.add(idx)
+  renderTrain()
+}
+
+function finishWorkout() {
+  const w = state.workout
+  const log = {
+    id: Date.now(),
+    date: new Date().toISOString(),
+    dayId: w.dayId,
+    dayLabel: w.dayLabel,
+    dayName: w.dayName,
+    durationMs: Date.now() - state.workoutStart,
+    exercises: w.exercises.map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      muscle: ex.muscle,
+      sets: ex.sets.filter(s => s.done).map(s => ({ weight: s.weight, reps: s.reps }))
+    }))
+  }
+  DB.logs.unshift(log)
+  save(DB)
+  if (state.elapsedTimer) { clearInterval(state.elapsedTimer); state.elapsedTimer = null }
+  state.workout = null
+  state.workoutStart = null
+  showToast('訓練完成！紀錄已儲存 ✓')
+  navigate('history')
+}
+
+function abandonWorkout() {
+  if (!confirm('確定放棄本次訓練？記錄不會儲存。')) return
+  if (state.elapsedTimer) { clearInterval(state.elapsedTimer); state.elapsedTimer = null }
+  state.workout = null
+  state.workoutStart = null
+  navigate('overview')
+}
+
+// ════════════════════════════════
+//  RENDER HISTORY
+// ════════════════════════════════
+function renderHistory() {
+  const el = document.getElementById('history-content')
+  if (DB.logs.length === 0) {
+    el.innerHTML = `
+      <div class="page-title">紀錄</div>
+      <div class="page-sub">訓練紀錄</div>
+      <div class="empty">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">尚無訓練紀錄</div>
+        <div>完成第一次訓練後就會出現在這裡</div>
+      </div>`
+    return
+  }
+
+  let items = ''
+  DB.logs.forEach((log, li) => {
+    const d = new Date(log.date)
+    const isOpen = state.expandedHistItems.has(log.id)
+    let detail = ''
+    if (isOpen) {
+      detail = `<div class="hist-detail open">`
+      log.exercises.forEach(ex => {
+        if (ex.sets.length === 0) return
+        ex.sets.forEach((s, si) => {
+          detail += `<div class="hist-set-row">
+            <span class="hist-set-name">${ex.name} 第${si+1}組</span>
+            <span class="hist-set-val">${s.weight ? s.weight+'kg' : '—'} × ${s.reps || '—'}</span>
+          </div>`
+        })
+      })
+      detail += `</div>`
+    }
+    items += `<div class="hist-item" onclick="toggleHistItem(${log.id})">
+      <div class="hist-date">${formatDate(d)} · ${formatDuration(log.durationMs)}</div>
+      <div class="hist-title">${log.dayLabel} — ${log.dayName}</div>
+      <div class="hist-tags">${log.exercises.map(e=>`<span class="hist-tag">${e.name.split(' ')[0]}</span>`).join('')}</div>
+      ${detail}
+    </div>`
+  })
+
+  el.innerHTML = `
+    <div class="page-title">紀錄</div>
+    <div class="page-sub">共 ${DB.logs.length} 次訓練</div>
+    ${items}`
+}
+
+function toggleHistItem(id) {
+  if (state.expandedHistItems.has(id)) state.expandedHistItems.delete(id)
+  else state.expandedHistItems.add(id)
+  renderHistory()
+}
+
+// ════════════════════════════════
+//  TIMER
+// ════════════════════════════════
+const CIRC = 603.19 // 2*PI*96
+
+function startTimer(seconds) {
+  clearTimer()
+  state.timer = { active: true, duration: seconds, remaining: seconds, interval: null, paused: false }
+  document.getElementById('timer-overlay').style.display = 'flex'
+  highlightPreset(seconds)
+  updateTimerUI()
+  state.timer.interval = setInterval(timerTick, 1000)
+}
+
+function timerTick() {
+  if (state.timer.remaining > 0) {
+    state.timer.remaining--
+    updateTimerUI()
+  } else {
+    timerDone()
+  }
+}
+
+function timerDone() {
+  clearTimer()
+  playBeep()
+  const ring = document.getElementById('timer-ring')
+  ring.classList.add('done')
+  const lbl = document.getElementById('timer-lbl')
+  if (lbl) lbl.textContent = '時間到！'
+  setTimeout(() => {
+    ring.classList.remove('done')
+    document.getElementById('timer-overlay').style.display = 'none'
+  }, 1800)
+}
+
+function clearTimer() {
+  if (state.timer.interval) { clearInterval(state.timer.interval); state.timer.interval = null }
+  state.timer.active = false
+}
+
+function toggleTimer() {
+  if (!state.timer.active) return
+  if (state.timer.paused) {
+    state.timer.paused = false
+    state.timer.interval = setInterval(timerTick, 1000)
+    document.getElementById('timer-pause-btn').textContent = '⏸ 暫停'
+  } else {
+    state.timer.paused = true
+    clearInterval(state.timer.interval)
+    state.timer.interval = null
+    document.getElementById('timer-pause-btn').textContent = '▶ 繼續'
+  }
+}
+
+function skipTimer() {
+  clearTimer()
+  document.getElementById('timer-overlay').style.display = 'none'
+}
+
+function setTimerPreset(sec) {
+  startTimer(sec)
+}
+
+function highlightPreset(sec) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'))
+  const map = { 60: 0, 90: 1, 120: 2, 180: 3 }
+  const idx = map[sec]
+  if (idx !== undefined) document.querySelectorAll('.preset-btn')[idx]?.classList.add('active')
+}
+
+function updateTimerUI() {
+  const { remaining, duration } = state.timer
+  const m = Math.floor(remaining / 60)
+  const s = remaining % 60
+  const el = document.getElementById('timer-time')
+  const prog = document.getElementById('ring-progress')
+  const ring = document.getElementById('timer-ring')
+  if (el) el.textContent = `${m}:${s.toString().padStart(2,'0')}`
+  if (prog) {
+    const offset = CIRC * (1 - remaining / duration)
+    prog.style.strokeDashoffset = offset
+  }
+  if (ring) {
+    ring.classList.remove('warning','danger')
+    if (remaining <= 10) ring.classList.add('danger')
+    else if (remaining <= 30) ring.classList.add('warning')
+  }
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    ;[0, 0.35, 0.7].forEach(t => {
+      const o = ctx.createOscillator()
+      const g = ctx.createGain()
+      o.connect(g); g.connect(ctx.destination)
+      o.type = 'sine'; o.frequency.value = 880
+      g.gain.setValueAtTime(0, ctx.currentTime + t)
+      g.gain.linearRampToValueAtTime(0.4, ctx.currentTime + t + 0.05)
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.35)
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.35)
+    })
+  } catch(e) {}
+}
+
+// ════════════════════════════════
+//  HELPERS
+// ════════════════════════════════
+function formatDate(d) {
+  const days = ['週日','週一','週二','週三','週四','週五','週六']
+  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${days[d.getDay()]}`
+}
+
+function formatElapsed(startMs) {
+  if (!startMs) return '0:00'
+  const sec = Math.floor((Date.now() - startMs) / 1000)
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${s.toString().padStart(2,'0')}`
+}
+
+function formatDuration(ms) {
+  if (!ms) return ''
+  const m = Math.floor(ms / 60000)
+  return m + ' 分鐘'
+}
+
+function isWorkoutDoneOnDate(date) {
+  return DB.logs.some(log => {
+    const d = new Date(log.date)
+    return d.getFullYear() === date.getFullYear() &&
+           d.getMonth() === date.getMonth() &&
+           d.getDate() === date.getDate()
+  })
+}
+
+function isWorkoutDoneToday() {
+  return isWorkoutDoneOnDate(new Date())
+}
+
+function getThisWeekWorkoutCount() {
+  const today = new Date()
+  const weekStart = new Date(today)
+  weekStart.setDate(today.getDate() - today.getDay())
+  weekStart.setHours(0,0,0,0)
+  return DB.logs.filter(log => new Date(log.date) >= weekStart).length
+}
+
+function getCurrentStreak() {
+  if (DB.logs.length === 0) return 0
+  // Count consecutive weeks with at least 1 workout
+  let streak = 0
+  const today = new Date()
+  for (let w = 0; w < 52; w++) {
+    const weekEnd = new Date(today)
+    weekEnd.setDate(today.getDate() - w * 7)
+    const weekStart = new Date(weekEnd)
+    weekStart.setDate(weekEnd.getDate() - 6)
+    weekStart.setHours(0,0,0,0)
+    weekEnd.setHours(23,59,59,999)
+    const hasLog = DB.logs.some(log => {
+      const d = new Date(log.date)
+      return d >= weekStart && d <= weekEnd
+    })
+    if (hasLog) streak++
+    else if (w > 0) break
+  }
+  return streak
+}
+
+function getTodayProgramDay() {
+  // Return program day based on rotation from logs
+  const dow = new Date().getDay()
+  if (!PROGRAM.trainingDays.includes(dow)) return null
+  const count = DB.logs.length
+  return PROGRAM.days[count % PROGRAM.days.length]
+}
+
+function getRecommendedDay() {
+  const count = DB.logs.length
+  const day = PROGRAM.days[count % PROGRAM.days.length]
+  return `${day.label} — ${day.name}`
+}
+
+function getNextTrainingDay() {
+  const today = new Date().getDay()
+  for (let i = 1; i <= 7; i++) {
+    const d = (today + i) % 7
+    if (PROGRAM.trainingDays.includes(d)) {
+      const names = ['週日','週一','週二','週三','週四','週五','週六']
+      return names[d]
+    }
+  }
+  return '本週內'
+}
+
+function getNextDateForProgramDay(dayId) {
+  const today = new Date().getDay()
+  const dow = PROGRAM.trainingDays
+  for (let i = 0; i <= 7; i++) {
+    const d = (today + i) % 7
+    if (dow.includes(d)) {
+      const names = ['週日','週一','週二','週三','週四','週五','週六']
+      return i === 0 ? '今天' : i === 1 ? '明天' : names[d]
+    }
+  }
+  return '本週'
+}
+
+function getPreviousBest(exId) {
+  for (const log of DB.logs) {
+    const ex = log.exercises.find(e => e.id === exId)
+    if (ex && ex.sets.length > 0) {
+      const best = ex.sets.reduce((a, b) => {
+        const av = parseFloat(a.weight||0) * parseFloat(a.reps||0)
+        const bv = parseFloat(b.weight||0) * parseFloat(b.reps||0)
+        return av >= bv ? a : b
+      })
+      if (best.weight || best.reps) {
+        return `${best.weight ? best.weight+'kg' : '—'} × ${best.reps || '—'}`
+      }
+    }
+  }
+  return null
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.classList.add('show')
+  setTimeout(() => t.classList.remove('show'), 2500)
+}
+
+// ════════════════════════════════
+//  INIT
+// ════════════════════════════════
+render()
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {})
+}
+</script>
+</body>
+</html>
