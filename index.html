@@ -297,13 +297,15 @@ let DB = load()
 // ════════════════════════════════
 let state = {
   tab: 'overview',
-  workout: null,      // active workout
+  workout: null,
   workoutStart: null,
   elapsedTimer: null,
   expandedDays: new Set(['A']),
   expandedHistItems: new Set(),
   expandedActiveEx: new Set(),
-  timer: { active: false, duration: 90, remaining: 0, interval: null, paused: false }
+  timer: { active: false, duration: 90, remaining: 0, interval: null, paused: false },
+  syncing: false,
+  syncError: false
 }
 
 // ════════════════════════════════
@@ -681,6 +683,7 @@ function finishWorkout() {
   state.workout = null
   state.workoutStart = null
   showToast('訓練完成！紀錄已儲存 ✓')
+  syncOneLog(log)
   navigate('history')
 }
 
@@ -697,10 +700,33 @@ function abandonWorkout() {
 // ════════════════════════════════
 function renderHistory() {
   const el = document.getElementById('history-content')
+  const url = DB.sheetsUrl || ''
+  const syncStatus = state.syncing ? '同步中…' : (state.syncError ? '同步失敗' : (url ? '已設定' : '未設定'))
+  const syncColor = state.syncing ? 'var(--warn)' : (state.syncError ? 'var(--danger)' : (url ? 'var(--accent)' : 'var(--t3)'))
+
+  const settingsPanel = `
+    <div class="section-label">Google Sheets 同步</div>
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:13px;color:var(--t2)">狀態</span>
+        <span style="font-size:13px;font-weight:600;color:${syncColor}">${syncStatus}</span>
+      </div>
+      <div style="font-size:11px;color:var(--t3);margin-bottom:8px">Apps Script 網址</div>
+      <div style="display:flex;gap:8px">
+        <input id="sheets-url-input" type="url" placeholder="https://script.google.com/macros/s/..."
+          value="${url}"
+          style="flex:1;background:var(--s2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;color:var(--text);font-size:13px;outline:none">
+        <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="saveAndSync()">儲存</button>
+      </div>
+      ${url ? `<button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="importFromSheets()">⬇ 從 Sheets 匯入紀錄</button>` : ''}
+    </div>
+  `
+
   if (DB.logs.length === 0) {
     el.innerHTML = `
       <div class="page-title">紀錄</div>
       <div class="page-sub">訓練紀錄</div>
+      ${settingsPanel}
       <div class="empty">
         <div class="empty-icon">📋</div>
         <div class="empty-title">尚無訓練紀錄</div>
@@ -738,6 +764,8 @@ function renderHistory() {
   el.innerHTML = `
     <div class="page-title">紀錄</div>
     <div class="page-sub">共 ${DB.logs.length} 次訓練</div>
+    ${settingsPanel}
+    <div class="section-label">歷史紀錄</div>
     ${items}`
 }
 
@@ -979,6 +1007,85 @@ function showToast(msg) {
   t.textContent = msg
   t.classList.add('show')
   setTimeout(() => t.classList.remove('show'), 2500)
+}
+
+// ════════════════════════════════
+//  GOOGLE SHEETS SYNC
+// ════════════════════════════════
+function getSheetsUrl() { return DB.sheetsUrl || '' }
+
+function saveAndSync() {
+  const input = document.getElementById('sheets-url-input')
+  if (!input) return
+  const url = input.value.trim()
+  DB.sheetsUrl = url
+  save(DB)
+  if (url) syncAllPending()
+  renderHistory()
+}
+
+async function syncOneLog(log) {
+  const url = getSheetsUrl()
+  if (!url) return
+  try {
+    state.syncing = true
+    await fetch(url, { method: 'POST', body: JSON.stringify(log) })
+    state.syncing = false
+    state.syncError = false
+  } catch(e) {
+    state.syncing = false
+    state.syncError = true
+  }
+}
+
+async function syncAllPending() {
+  const url = getSheetsUrl()
+  if (!url || DB.logs.length === 0) return
+  state.syncing = true
+  state.syncError = false
+  if (state.tab === 'history') renderHistory()
+  try {
+    for (const log of DB.logs) {
+      await fetch(url, { method: 'POST', body: JSON.stringify(log) })
+    }
+    state.syncing = false
+    showToast('已同步到 Google Sheets ✓')
+  } catch(e) {
+    state.syncing = false
+    state.syncError = true
+    showToast('同步失敗，請檢查網址')
+  }
+  if (state.tab === 'history') renderHistory()
+}
+
+async function importFromSheets() {
+  const url = getSheetsUrl()
+  if (!url) return
+  state.syncing = true
+  if (state.tab === 'history') renderHistory()
+  try {
+    const res = await fetch(url)
+    const data = await res.json()
+    if (data.ok && Array.isArray(data.logs) && data.logs.length > 0) {
+      const existingIds = new Set(DB.logs.map(l => String(l.id)))
+      let added = 0
+      data.logs.forEach(log => {
+        if (!existingIds.has(String(log.id))) { DB.logs.push(log); added++ }
+      })
+      DB.logs.sort((a, b) => new Date(b.date) - new Date(a.date))
+      save(DB)
+      showToast(`匯入完成，新增 ${added} 筆紀錄`)
+    } else {
+      showToast('Sheets 上目前沒有紀錄')
+    }
+    state.syncing = false
+    state.syncError = false
+  } catch(e) {
+    state.syncing = false
+    state.syncError = true
+    showToast('匯入失敗，請確認網址正確')
+  }
+  if (state.tab === 'history') renderHistory()
 }
 
 // ════════════════════════════════
