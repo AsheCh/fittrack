@@ -1,5 +1,5 @@
 const CACHE = 'fittrack-v1'
-const ASSETS = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png']
+const ASSETS = ['/fittrack/', '/fittrack/index.html', '/fittrack/manifest.json', '/fittrack/icon-192.png', '/fittrack/icon-512.png']
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.filter(a => !a.endsWith('.png') || true))))
