@@ -772,10 +772,16 @@ function renderHistory() {
       })
       detail += `</div>`
     }
-    items += `<div class="hist-item" onclick="toggleHistItem(${log.id})">
-      <div class="hist-date">${formatDate(d)} · ${formatDuration(log.durationMs)}</div>
-      <div class="hist-title">${log.dayLabel} — ${log.dayName}</div>
-      <div class="hist-tags">${log.exercises.map(e=>`<span class="hist-tag">${e.name.split(' ')[0]}</span>`).join('')}</div>
+    items += `<div class="hist-item">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px" onclick="toggleHistItem(${log.id})">
+        <div style="flex:1;min-width:0">
+          <div class="hist-date">${formatDate(d)} · ${formatDuration(log.durationMs)}</div>
+          <div class="hist-title">${log.dayLabel} — ${log.dayName}</div>
+          <div class="hist-tags">${log.exercises.map(e=>`<span class="hist-tag">${e.name.split(' ')[0]}</span>`).join('')}</div>
+        </div>
+        <button onclick="event.stopPropagation();deleteLog(${log.id})"
+          style="flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--s2);color:var(--t3);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:2px">✕</button>
+      </div>
       ${detail}
     </div>`
   })
@@ -791,6 +797,15 @@ function renderHistory() {
 function toggleHistItem(id) {
   if (state.expandedHistItems.has(id)) state.expandedHistItems.delete(id)
   else state.expandedHistItems.add(id)
+  renderHistory()
+}
+
+function deleteLog(id) {
+  if (!confirm('確定刪除這筆訓練紀錄？')) return
+  DB.logs = DB.logs.filter(l => l.id !== id)
+  state.expandedHistItems.delete(id)
+  save(DB)
+  showToast('已刪除')
   renderHistory()
 }
 
